@@ -2586,13 +2586,15 @@ function addVideo() {
     views: 0,
     added: new Date().toLocaleDateString()
   };
-  // Save locally
+  // Save to API + locally
   toast('⏳ جاري الحفظ...');
   state.videos.unshift(video);
   save();
   renderGallery();
   renderAdminVideos();
-  toast('✓ تم إضافة الفيديو');
+  dbSaveVideo(video).then(() => {
+    toast('✓ تم إضافة الفيديو وحفظه في قاعدة البيانات');
+  });
   // Clear form
   ['up-url','up-title','up-dur','up-desc','up-thumb'].forEach(id => {
     const el = document.getElementById(id);
@@ -2610,6 +2612,7 @@ function deleteVideo(id) {
   save();
   renderGallery();
   renderAdminVideos();
+  dbDeleteVideo(id);
   toast('✓ تم حذف الفيديو');
 }
 

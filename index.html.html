@@ -1604,6 +1604,16 @@ html[dir="rtl"] .section-label::before {
           <p style="font-size:11px;margin-top:6px;color:#555">MP4 · MOV · WEBM · Max recommended: 30 sec</p>
         </div>
         <input id="bg-file-input" type="file" accept="video/mp4,video/mov,video/webm,video/*" style="display:none" onchange="handleBgFileSelect(event)">
+        
+        <!-- OR use URL -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;letter-spacing:2px;color:var(--gray);text-transform:uppercase;margin-bottom:8px;">أو أدخل رابط فيديو مباشر (MP4 URL)</div>
+          <div style="display:flex;gap:8px;">
+            <input id="bg-url-input" type="text" placeholder="https://example.com/video.mp4" 
+                   style="flex:1;background:rgba(255,255,255,0.04);border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px;color:var(--white);font-size:13px;outline:none;">
+            <button onclick="setBgVideoFromUrl()" class="btn-primary" style="padding:10px 16px;font-size:12px;">تطبيق</button>
+          </div>
+        </div>
         <div id="bg-current" style="display:none;background:rgba(229,9,20,0.07);border:1px solid rgba(229,9,20,0.2);border-radius:8px;padding:16px;margin-bottom:16px;align-items:center;gap:14px;">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--red)"><circle cx="12" cy="12" r="10" fill="rgba(229,9,20,0.15)" stroke="var(--red)" stroke-width="1.5"/><polygon points="10 8 16 12 10 16" fill="var(--red)"/></svg>
           <div>
@@ -2886,10 +2896,38 @@ function saveContact() {
   if (state.contact.wa) document.getElementById('wa-btn').href = 'https://wa.me/' + state.contact.wa.replace(/\D/g,'');
   if (state.contact.ig) document.getElementById('ig-btn').href = state.contact.ig;
   if (state.contact.li) document.getElementById('li-btn').href = state.contact.li;
+  // Save to API
+  fetch(API_URL + '/settings', {
+    method: 'POST',
+    headers: apiHeaders(true),
+    body: JSON.stringify({ contact: state.contact })
+  }).catch(e => console.warn('API contact save failed:', e));
   toast('✓ تم حفظ روابط التواصل');
 }
 
-function loadContact() {
+async function loadContact() {
+  // Try to load from API first
+  try {
+    const res = await fetch(API_URL + '/settings');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data && json.data.contact) {
+        state.contact = json.data.contact;
+        save();
+      }
+      if (json.data && json.data.bgVideoUrl) {
+        state.bgVideoUrl = json.data.bgVideoUrl;
+        const vid = document.getElementById('bg-video');
+        if (vid && state.bgVideoUrl) {
+          vid.src = state.bgVideoUrl;
+          vid.style.display = 'block';
+          document.getElementById('bg-placeholder').style.display = 'none';
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('API settings load failed, using localStorage:', e.message);
+  }
   if (state.contact.wa) document.getElementById('wa-btn').href = 'https://wa.me/' + state.contact.wa.replace(/\D/g,'');
   if (state.contact.ig) document.getElementById('ig-btn').href = state.contact.ig;
   if (state.contact.li) document.getElementById('li-btn').href = state.contact.li;
@@ -3021,7 +3059,32 @@ function removeBgVideo() {
   document.getElementById('bg-current').style.display = 'none';
   document.getElementById('bg-preview-wrap').style.display = 'none';
   document.getElementById('bg-admin-preview').src = '';
+  // Remove from API too
+  fetch(API_URL + '/settings', {
+    method: 'POST',
+    headers: apiHeaders(true),
+    body: JSON.stringify({ bgVideoUrl: '' })
+  }).catch(e => {});
   toast('Background video removed');
+}
+
+function setBgVideoFromUrl() {
+  const url = document.getElementById('bg-url-input').value.trim();
+  if (!url) { toast('⚠ أدخل رابط الفيديو'); return; }
+  state.bgVideoUrl = url;
+  state.bgVideoName = url.split('/').pop();
+  applyBgVideo(url);
+  document.getElementById('bg-filename').textContent = state.bgVideoName;
+  document.getElementById('bg-current').style.display = 'flex';
+  document.getElementById('bg-preview-wrap').style.display = 'block';
+  document.getElementById('bg-admin-preview').src = url;
+  // Save to API
+  fetch(API_URL + '/settings', {
+    method: 'POST',
+    headers: apiHeaders(true),
+    body: JSON.stringify({ bgVideoUrl: url })
+  }).then(() => toast('✓ تم حفظ فيديو الخلفية'))
+    .catch(e => toast('⚠ لم يتم حفظ الفيديو في قاعدة البيانات'));
 }
 
 function initBgVideoAdminUI() {
